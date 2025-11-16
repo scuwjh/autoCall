@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>随机点名系统</title>
+    <style>
+        body {
+            background: linear-gradient(135deg, #87CEEB 0%, #B0E0E6 30%, #E0F6FF 60%, #B0E0E6 100%);
+            font-family: 'Comic Sans MS', cursive, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        
+        h1 {
+            color: #ff6b6b;
+            font-size: 3.5rem;
+            margin: 2rem 0;
+            text-shadow: 3px 3px 0px #fff, 6px 6px 10px rgba(0,0,0,0.1);
+            animation: bounce 2s ease-in-out infinite;
+        }
+        
+        @keyframes bounce {
+            0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+            40% { transform: translateY(-10px); }
+            60% { transform: translateY(-5px); }
+        }
+        
+        #canvas {
+            border: 8px solid #fff;
+            border-radius: 25px;
+            box-shadow: 0 15px 40px rgba(0,0,0,0.2), 0 5px 20px rgba(255,107,107,0.3);
+            background: linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(254,207,239,0.3) 100%);
+            margin-bottom: 2rem;
+            max-width: 90vw;
+            /* 移除冲突的高度设置，让JavaScript完全控制 */
+        }
+        
+        .controls {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1.5rem;
+            width: 100%;
+            max-width: 500px;
+            padding: 0 1rem;
+        }
+        
+        #startBtn {
+            background: linear-gradient(135deg, #4ecdc4 0%, #44a08d 100%);
+            color: white;
+            border: 3px solid #fff;
+            padding: 1.2rem 2.5rem;
+            font-size: 1.8rem;
+            border-radius: 60px;
+            cursor: pointer;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.2), 0 3px 10px rgba(0,0,0,0.1);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            font-family: 'Comic Sans MS', cursive;
+            font-weight: bold;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.2);
+            width: 100%;
+            max-width: 300px;
+        }
+        
+        #startBtn:hover {
+            transform: translateY(-5px) scale(1.05);
+            box-shadow: 0 15px 40px rgba(0,0,0,0.3);
+        }
+        
+        #startBtn:active {
+            transform: translateY(0) scale(0.98);
+        }
+        
+        #speedSlider {
+            width: 350px;
+            height: 12px;
+            border-radius: 10px;
+            background: linear-gradient(to right, #ffb3ba 0%, #ffb3ba 50%, #ddd 50%, #ddd 100%);
+            outline: none;
+            -webkit-appearance: none;
+            width: 100%;
+            max-width: 350px;
+        }
+        
+        #speedSlider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 35px;
+            height: 35px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, #fff 0%, #fff 30%, #45b7d1 30%, #45b7d1 100%);
+            cursor: pointer;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3), 0 2px 5px rgba(0,0,0,0.2);
+            transition: all 0.3s ease;
+            border: 3px solid #fff;
+        }
+        
+        #speedSlider::-moz-range-thumb {
+            width: 35px;
+            height: 35px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, #fff 0%, #fff 30%, #45b7d1 30%, #45b7d1 100%);
+            cursor: pointer;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            border: 3px solid #fff;
+        }
+        
+        .speed-label {
+            color: #ff6b6b;
+            font-size: 1.4rem;
+            font-weight: bold;
+            text-shadow: 1px 1px 0px #fff;
+        }
+        
+        #fileInput {
+            background: linear-gradient(135deg, rgba(255,255,255,0.9) 0%, rgba(255,179,186,0.5) 100%);
+            padding: 0.8rem 1.5rem;
+            border-radius: 30px;
+            font-size: 1.2rem;
+            cursor: pointer;
+            border: 2px solid #fff;
+            box-shadow: 0 3px 15px rgba(0,0,0,0.1);
+            transition: all 0.3s ease;
+            font-family: 'Comic Sans MS', cursive;
+            width: 100%;
+            max-width: 250px;
+        }
+        
+        #fileInput:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+        }
+        
+        /* 弹窗样式 */
+        .popup-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.6);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        
+        .popup-overlay.active {
+            display: flex;
+        }
+        
+        .popup-overlay.show {
+            opacity: 1;
+        }
+        
+        /* 确保弹窗关闭时不显示 */
+        .popup-overlay:not(.active) {
+            display: none !important;
+        }
+        
+        .popup-content {
+            background: linear-gradient(135deg, #ffffff 0%, #f9f9f9 100%);
+            border-radius: 25px;
+            padding: 40px;
+            text-align: center;
+            box-shadow: 0 25px 80px rgba(0, 0, 0, 0.3);
+            border: 5px solid #4ecdc4;
+            max-width: 500px;
+            width: 90%;
+            transform: scale(0.9);
+            transition: transform 0.3s ease;
+            position: relative;
+        }
+        
+        .popup-overlay.show .popup-content {
+            transform: scale(1);
+        }
+        
+        .popup-title {
+            color: #ff6b6b;
+            font-size: 2.2rem;
+            margin-bottom: 20px;
+            font-weight: bold;
+            text-shadow: 2px 2px 0px rgba(255, 255, 255, 0.8);
+        }
+        
+        .popup-name {
+            color: #4CAF50;
+            font-size: 3rem;
+            margin: 20px 0;
+            font-weight: bold;
+            text-shadow: 3px 3px 0px rgba(255, 255, 255, 0.8);
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        
+        .popup-message {
+            color: #666;
+            font-size: 1.2rem;
+            margin-bottom: 30px;
+        }
+        
+        .popup-close-btn {
+            background: linear-gradient(135deg, #4ecdc4 0%, #44a08d 100%);
+            color: white;
+            border: 3px solid #fff;
+            padding: 12px 30px;
+            font-size: 1.2rem;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            transition: all 0.3s ease;
+            font-family: 'Comic Sans MS', cursive;
+            font-weight: bold;
+        }
+        
+        .popup-close-btn:hover {
+            transform: translateY(-3px) scale(1.05);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+        }
+        
+        .popup-close-btn:active {
+            transform: translateY(0) scale(0.98);
+        }
+        
+        /* 响应式弹窗 */
+        @media (max-width: 768px) {
+            .popup-content {
+                padding: 30px 20px;
+                border-radius: 20px;
+                border-width: 4px;
+            }
+            
+            .popup-title {
+                font-size: 1.8rem;
+            }
+            
+            .popup-name {
+                font-size: 2.5rem;
+            }
+            
+            .popup-message {
+                font-size: 1.1rem;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .popup-content {
+                padding: 25px 15px;
+                border-radius: 15px;
+                border-width: 3px;
+            }
+            
+            .popup-title {
+                font-size: 1.5rem;
+            }
+            
+            .popup-name {
+                font-size: 2rem;
+            }
+            
+            .popup-message {
+                font-size: 1rem;
+            }
+            
+            .popup-close-btn {
+                padding: 10px 25px;
+                font-size: 1.1rem;
+            }
+        }
+        
+        /* 响应式设计 - 移动设备 */
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 2.5rem;
+                margin: 1.5rem 0;
+                text-shadow: 2px 2px 0px #fff, 4px 4px 8px rgba(0,0,0,0.1);
+            }
+            
+            #canvas {
+                border: 6px solid #fff;
+                border-radius: 20px;
+                width: 95vw;
+                height: auto;
+                aspect-ratio: 2/1;
+            }
+            
+            .controls {
+                gap: 1.2rem;
+                padding: 0 0.8rem;
+            }
+            
+            #startBtn {
+                padding: 1rem 2rem;
+                font-size: 1.5rem;
+                border: 2px solid #fff;
+                max-width: 250px;
+            }
+            
+            #speedSlider {
+                height: 10px;
+            }
+            
+            #speedSlider::-webkit-slider-thumb {
+                width: 30px;
+                height: 30px;
+                border: 2px solid #fff;
+            }
+            
+            #speedSlider::-moz-range-thumb {
+                width: 30px;
+                height: 30px;
+                border: 2px solid #fff;
+            }
+            
+            .speed-label {
+                font-size: 1.2rem;
+            }
+            
+            #fileInput {
+                padding: 0.7rem 1.2rem;
+                font-size: 1rem;
+                border: 2px solid #fff;
+                max-width: 200px;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            h1 {
+                font-size: 2rem;
+                margin: 1rem 0;
+                text-shadow: 1px 1px 0px #fff, 2px 2px 4px rgba(0,0,0,0.1);
+            }
+            
+            #canvas {
+                border: 4px solid #fff;
+                border-radius: 15px;
+            }
+            
+            .controls {
+                gap: 1rem;
+            }
+            
+            #startBtn {
+                padding: 0.8rem 1.5rem;
+                font-size: 1.3rem;
+            }
+            
+            #speedSlider::-webkit-slider-thumb {
+                width: 25px;
+                height: 25px;
+            }
+            
+            #speedSlider::-moz-range-thumb {
+                width: 25px;
+                height: 25px;
+            }
+            
+            .speed-label {
+                font-size: 1.1rem;
+            }
+            
+            #fileInput {
+                padding: 0.6rem 1rem;
+                font-size: 0.9rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>🎲 随机点名</h1>
+    <canvas id="canvas" width="800" height="400"></canvas>
+    <div class="controls">
+        <button id="startBtn">开始点名</button>
+        <input type="range" id="speedSlider" min="1" max="100" value="50">
+        <div class="speed-label">速度: <span id="speedValue">50</span></div>
+        <input type="file" id="fileInput" accept=".xlsx, .xls">
+    </div>
+    
+    <!-- 弹窗组件 -->
+    <div id="resultPopup" class="popup-overlay">
+        <div class="popup-content">
+            <h2 class="popup-title">🎉 恭喜选中</h2>
+            <div class="popup-name" id="popupSelectedName">--</div>
+            <p class="popup-message">请点击下方按钮继续</p>
+            <button id="popupCloseBtn" class="popup-close-btn">确定</button>
+        </div>
+    </div>
+    <script>
+        // 生成60个模拟学生姓名
+        const studentNames = [];
+        
+        // 扩展常见姓氏列表（增加更多常见中国姓氏）
+        const familyNames = [
+            '张', '王', '李', '刘', '陈', '杨', '赵', '黄', '周', '吴',
+            '徐', '孙', '胡', '朱', '高', '林', '何', '郭', '马', '罗',
+            '梁', '宋', '郑', '谢', '韩', '唐', '冯', '于', '董', '萧',
+            '程', '曹', '袁', '邓', '许', '傅', '沈', '曾', '彭', '吕'
+        ];
+        
+        // 区分性别名字列表
+        const maleGivenNames = [
+            '伟', '强', '军', '勇', '杰', '涛', '磊', '超', '明', '刚',
+            '辉', '飞', '阳', '晨', '宇', '轩', '浩', '博', '瑞', '泽',
+            '子轩', '浩然', '俊杰', '宇航', '子涵', '子豪', '雨泽', '浩宇', '博文', '宇轩'
+        ];
+        
+        const femaleGivenNames = [
+            '芳', '娜', '敏', '静', '丽', '娟', '艳', '玲', '秀', '霞',
+            '慧', '颖', '芳', '燕', '婷', '莉', '兰', '琴', '梅', '丹',
+            '雨桐', '梦琪', '心怡', '佳怡', '雨嘉', '思琪', '诗琪', '梦涵', '雪', '梦'
+        ];
+        
+        // studentNames已经在上面声明并初始化为空数组
+        
+        // 添加固定的测试姓名作为保底
+        const fixedNames = ['张三', '李四', '王五', '赵六', '钱七', '孙八', '周九', '吴十'];
+        studentNames.push(...fixedNames);
+        
+        // 生成更多随机姓名
+        const generatedNames = new Set(fixedNames); // 初始包含固定姓名，确保不重复
+        
+        while (generatedNames.size < 60) {
+            // 随机选择姓氏
+            const familyName = familyNames[Math.floor(Math.random() * familyNames.length)];
+            
+            // 随机确定性别（50%概率）
+            const isMale = Math.random() > 0.5;
+            const givenNamesPool = isMale ? maleGivenNames : femaleGivenNames;
+            
+            // 随机选择名字
+            const givenName = givenNamesPool[Math.floor(Math.random() * givenNamesPool.length)];
+            
+            // 组合姓名
+            let fullName = familyName + givenName;
+            
+            // 20%的概率添加性别标识
+            if (Math.random() > 0.8) {
+                fullName += isMale ? '同学' : '同学';
+            }
+            
+            // 30%的概率添加班号或学号标识
+            if (Math.random() > 0.7) {
+                const classNum = Math.floor(Math.random() * 3) + 1; // 1-3班
+                const studentNum = Math.floor(Math.random() * 60) + 1; // 1-60号
+                fullName += `(${classNum}班${studentNum}号)`;
+            }
+            
+            generatedNames.add(fullName);
+        }
+        
+        // 清空并更新studentNames数组
+        studentNames.length = 0; // 清空数组
+        studentNames.push(...Array.from(generatedNames));
+        
+        // 打乱姓名顺序
+        studentNames.sort(() => Math.random() - 0.5);
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // 响应式Canvas处理
+        function resizeCanvas() {
+            const containerWidth = canvas.parentElement.clientWidth;
+            const maxWidth = Math.min(containerWidth * 0.95, 800);
+            
+            // 设置Canvas的实际绘图尺寸（重要！）
+            canvas.width = maxWidth;
+            
+            // 保持宽高比
+            const aspectRatio = 2; // 800:400
+            canvas.height = maxWidth / aspectRatio;
+            
+            // 设置CSS样式尺寸
+            canvas.style.width = `${maxWidth}px`;
+            canvas.style.height = `${maxWidth / aspectRatio}px`;
+            
+            // 调整字体大小以适应Canvas - 增大字体尺寸
+            const fontSize = Math.min(72, Math.max(36, maxWidth * 0.09));
+            // 使用更适合中文的字体，统一使用双引号
+            ctx.font = `${fontSize}px "Microsoft YaHei", "微软雅黑", Arial, sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+        }
+        
+        // 初始化和监听窗口大小变化
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+        
+        // 移除调试代码
+        let isRolling = false;
+        let currentIndex = 0;
+        let speed = 50;
+        let lastTime = 0;
+        let selectedName = '';
+        
+        // 获取弹窗元素
+        const resultPopup = document.getElementById('resultPopup');
+        const popupSelectedName = document.getElementById('popupSelectedName');
+        const popupCloseBtn = document.getElementById('popupCloseBtn');
+        
+        // 显示弹窗函数
+        function showPopup(name) {
+            if (popupSelectedName && resultPopup) {
+                popupSelectedName.textContent = name;
+                // 先激活显示
+                resultPopup.classList.add('active');
+                // 触发重排
+                resultPopup.offsetHeight;
+                // 再添加动画效果
+                resultPopup.classList.add('show');
+                console.log('弹窗已显示，选中姓名:', name);
+            }
+        }
+        
+        // 隐藏弹窗函数
+        function hidePopup() {
+            if (resultPopup) {
+                resultPopup.classList.remove('show');
+                // 等待动画完成后再隐藏
+                setTimeout(() => {
+                    resultPopup.classList.remove('active');
+                    console.log('弹窗已隐藏');
+                }, 300);
+            }
+        }
+        
+        // 弹窗关闭按钮事件监听器
+        if (popupCloseBtn) {
+            popupCloseBtn.addEventListener('click', function(event) {
+                event.preventDefault();
+                event.stopPropagation();
+                hidePopup();
+            });
+        }
+        
+        // 点击遮罩层关闭弹窗
+        if (resultPopup) {
+            resultPopup.addEventListener('click', function(event) {
+                // 只有当点击的是遮罩层本身而不是内容时才关闭
+                if (event.target === resultPopup) {
+                    hidePopup();
+                }
+            });
+        }
+        
+        // 按ESC键关闭弹窗
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape' && resultPopup && resultPopup.classList.contains('active')) {
+                hidePopup();
+            }
+        });
+        
+        function draw() {
+            // 清空画布
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // 绘制背景色以便更好地看到文本
+            ctx.fillStyle = 'rgba(255, 255, 255, 1)'; // 不透明的背景，确保文本可见
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // 保存当前上下文状态
+            ctx.save();
+            
+            // 添加额外的安全检查，确保studentNames存在且有内容
+            if (!studentNames || studentNames.length === 0) {
+                // 如果没有姓名数据，显示默认内容
+                ctx.fillStyle = '#FF0000'; // 红色文本，引起注意
+                ctx.font = 'bold 36px "Microsoft YaHei", "微软雅黑", Arial, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('正在加载姓名数据...', canvas.width / 2, canvas.height / 2);
+                ctx.fillStyle = '#666';
+                ctx.font = '24px "Microsoft YaHei", "微软雅黑", Arial, sans-serif';
+                ctx.fillText('请点击"开始点名"按钮', canvas.width / 2, canvas.height / 2 + 40);
+                ctx.restore();
+                return;
+            }
+            
+            // 设置基础字体样式
+            const baseFontSize = parseFloat(ctx.font) || 48;
+            
+            // 绘制滚动的姓名
+            for (let i = -2; i <= 2; i++) {
+                const index = (currentIndex + i + studentNames.length) % studentNames.length;
+                // 确保获取有效的姓名
+                const name = studentNames[index] || '测试姓名';
+                const y = canvas.height / 2 + i * baseFontSize * 1.5;
+                const opacity = Math.max(0.3, 1 - Math.abs(i) * 0.3); // 增加最小透明度以提高可见性
+                
+                // 为每个名字保存独立的状态
+                ctx.save();
+                
+                // 确保文本对齐方式正确
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                
+                // 区分不同状态下的文本样式
+                if (i === 0 && !isRolling) {
+                    // 选中的姓名 - 使用更醒目的颜色和描边
+                    ctx.fillStyle = '#4CAF50'; // 绿色填充
+                    ctx.font = `bold ${baseFontSize * 1.1}px "Microsoft YaHei", "微软雅黑", Arial, sans-serif`;
+                    // 添加文字描边以增强可读性
+                    ctx.strokeStyle = '#333';
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeText(name, canvas.width / 2, y);
+                } else {
+                    // 改进：无论是滚动还是静态状态，都确保名字可见
+                    if (isRolling) {
+                        // 滚动状态下的名字使用更明显的颜色
+                        ctx.fillStyle = 'rgba(0, 0, 0, 0.9)'; // 深色文本确保可见
+                    } else {
+                        // 非滚动状态下的非中心名字
+                        ctx.fillStyle = `rgba(0, 0, 0, ${opacity})`;
+                    }
+                    ctx.font = `${baseFontSize}px "Microsoft YaHei", "微软雅黑", Arial, sans-serif`;
+                }
+                
+                // 绘制文本
+                ctx.fillText(name, canvas.width / 2, y);
+                
+                // 恢复上下文状态以避免样式污染
+                ctx.restore();
+            }
+            
+            // 恢复初始上下文状态
+            ctx.restore();
+        }
+        
+        // 动画函数 - 优化时间控制和错误处理
+        function animate(timestamp = 0) {
+            try {
+                // 确保canvas和ctx存在
+                if (!canvas || !ctx) {
+                    console.error('Canvas或Context未初始化');
+                    return;
+                }
+                
+                // 控制名字滚动速度
+                if (isRolling && timestamp - lastTime >= (100 - speed)) {
+                    // 当处于滚动状态时，更新当前索引
+                    lastTime = timestamp;
+                    currentIndex = (currentIndex + 1) % studentNames.length;
+                }
+                
+                // 绘制当前帧
+                draw();
+                
+                // 请求下一帧
+                requestAnimationFrame(animate);
+            } catch (error) {
+                console.error('动画循环中出错:', error);
+                // 即使出错也尝试继续动画循环
+                requestAnimationFrame(animate);
+            }
+        }
+        
+        // 开始/暂停按钮
+        const startBtn = document.getElementById('startBtn');
+        // 添加按钮点击事件，增强稳定性并添加调试信息
+        startBtn.addEventListener('click', function(event) {
+            event.preventDefault(); // 防止任何默认行为
+            event.stopPropagation(); // 防止冒泡
+            
+            console.log('按钮点击事件触发，当前isRolling状态:', isRolling);
+            
+            // 切换滚动状态
+            isRolling = !isRolling;
+            
+            // 更新按钮文本
+            try {
+                startBtn.textContent = isRolling ? '暂停' : '开始点名';
+                console.log('按钮文本已更新:', startBtn.textContent);
+            } catch (e) {
+                console.error('更新按钮文本失败:', e);
+            }
+            
+            // 当停止滚动时，记录选中的姓名
+            if (!isRolling && studentNames && studentNames.length > 0) {
+                selectedName = studentNames[currentIndex];
+                console.log('选中的姓名:', selectedName);
+                // 显示自定义弹窗而不是alert
+                showPopup(selectedName);
+            }
+        });
+        
+        // 确保按钮可以被正确点击（增强可访问性）
+        startBtn.style.cursor = 'pointer';
+        startBtn.style.userSelect = 'none';
+        
+        // 速度滑块
+        const speedSlider = document.getElementById('speedSlider');
+        const speedValue = document.getElementById('speedValue');
+        
+        // 初始化滑块背景渐变
+        const initSpeed = Number(speedSlider.value);
+        const maxSpeed = Number(speedSlider.max);
+        const initPercentage = (initSpeed / maxSpeed) * 100;
+        speedSlider.style.background = `linear-gradient(to right, #ffb3ba 0%, #ffb3ba ${initPercentage}%, #ddd ${initPercentage}%, #ddd 100%)`;
+        
+        // 滑块滑动事件
+        speedSlider.addEventListener('input', (e) => {
+            speed = Number(e.target.value);
+            speedValue.textContent = speed;
+            // 更新滑块背景渐变
+            const max = Number(e.target.max);
+            const percentage = (speed / max) * 100;
+            e.target.style.background = `linear-gradient(to right, #ffb3ba 0%, #ffb3ba ${percentage}%, #ddd ${percentage}%, #ddd 100%)`;
+        });
+        
+        // Excel导入功能
+        const fileInput = document.getElementById('fileInput');
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                // 检查是否为Excel文件
+                if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        const data = new Uint8Array(event.target.result);
+                        
+                        // 简单解析Excel文件（仅支持基本格式）
+                        try {
+                            // 使用SheetJS解析Excel文件
+                            if (typeof XLSX !== 'undefined') {
+                                const workbook = XLSX.read(data, { type: 'array' });
+                                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                                const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+                                
+                                // 提取所有非空单元格作为姓名
+                                const newNames = [];
+                                jsonData.forEach(row => {
+                                    row.forEach(cell => {
+                                        if (cell && typeof cell === 'string' && cell.trim() !== '') {
+                                            newNames.push(cell.trim());
+                                        }
+                                    });
+                                });
+                                
+                                if (newNames.length > 0) {
+                                    studentNames.length = 0;
+                                    studentNames.push(...newNames);
+                                    alert(`成功导入 ${newNames.length} 个姓名`);
+                                } else {
+                                    alert('未找到有效的姓名数据');
+                                }
+                            } else {
+                                alert('请先加载SheetJS库以支持Excel导入');
+                            }
+                        } catch (error) {
+                            alert('Excel解析失败: ' + error.message);
+                        }
+                    };
+                    reader.readAsArrayBuffer(file);
+                } else {
+                    // 处理文本文件
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        const data = event.target.result;
+                        const rows = data.split('\n').filter(row => row.trim() !== '');
+                        const newNames = rows.map(row => row.split('\t')[0].trim()).filter(name => name !== '');
+                        if (newNames.length > 0) {
+                            studentNames.length = 0;
+                            studentNames.push(...newNames);
+                            alert(`成功导入 ${newNames.length} 个姓名`);
+                        }
+                    };
+                    reader.readAsText(file);
+                }
+            }
+        });
+        
+        // 优化动画初始化，确保在DOM完全加载后启动
+        window.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM内容已完全加载，开始初始化动画');
+            
+            // 确保Canvas已准备好
+            if (canvas && ctx) {
+                console.log('Canvas准备就绪，启动动画循环');
+                
+                // 确保studentNames有数据，如果没有则添加一些默认测试数据
+                if (!studentNames || studentNames.length === 0) {
+                    console.log('添加默认测试姓名数据');
+                    const defaultNames = ['张三', '李四', '王五', '赵六', '孙七', '周八', '吴九', '郑十'];
+                    studentNames.push(...defaultNames);
+                }
+                
+                // 初始化currentIndex
+                currentIndex = Math.floor(Math.random() * studentNames.length);
+                console.log('初始化当前索引:', currentIndex);
+                
+                // 启动动画循环，requestAnimationFrame会自动传入时间戳
+                requestAnimationFrame(animate);
+            } else {
+                console.error('Canvas元素未准备就绪');
+            }
+        });
+    </script>
+    <!-- 引入SheetJS库以支持Excel导入 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    
+    <!-- 姓名生成和动画逻辑已整合到主脚本块中 -->
+</body>
+</html>
